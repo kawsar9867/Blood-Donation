@@ -37,12 +37,18 @@ export const AuthProvider = ({ children }) => {
           console.error("Token verification failed", err);
           // Token is expired or user is blocked
           logout();
+        } finally {
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     };
 
     if (token) {
       validateToken();
+    } else {
+      setLoading(false);
     }
   }, [token]);
 
@@ -56,6 +62,7 @@ export const AuthProvider = ({ children }) => {
       setUser(receivedUser);
       localStorage.setItem('token', receivedToken);
       localStorage.setItem('user', JSON.stringify(receivedUser));
+      setLoading(false);
       
       return { success: true };
     } catch (err) {
@@ -77,6 +84,7 @@ export const AuthProvider = ({ children }) => {
       setUser(receivedUser);
       localStorage.setItem('token', receivedToken);
       localStorage.setItem('user', JSON.stringify(receivedUser));
+      setLoading(false);
 
       return { success: true };
     } catch (err) {
