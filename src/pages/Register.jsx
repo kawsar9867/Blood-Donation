@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { districts, upazilas } from '../utils/geo';
 import Swal from 'sweetalert2';
 import axios from 'axios';
-import { User, Mail, ShieldAlert, MapPin, Dropdrop, Lock, Upload, Loader } from 'lucide-react';
+import { Loader } from 'lucide-react';
 
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
