@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { signInWithGoogle } from '../utils/googleAuth';
 import Swal from 'sweetalert2';
 import { Loader } from 'lucide-react';
 
@@ -40,36 +39,15 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    try {
-      const googleUser = await signInWithGoogle();
-      const response = await loginWithGoogle(googleUser.email, googleUser.name, googleUser.avatar);
-      setLoading(false);
+    const response = await loginWithGoogle();
+    setLoading(false);
 
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Logged In',
-          text: 'Welcome back with Google!',
-          timer: 1500,
-          showConfirmButton: false
-        });
-        navigate('/');
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Login Failed',
-          text: response.message
-        });
-      }
-    } catch (error) {
-      setLoading(false);
-      if (!error.message?.includes('dismissed')) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Auth Error',
-          text: error.message
-        });
-      }
+    if (!response.success) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Google Login Failed',
+        text: response.message
+      });
     }
   };
 

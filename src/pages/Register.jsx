@@ -5,7 +5,6 @@ import { districts, upazilas } from '../utils/geo';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import { Loader } from 'lucide-react';
-import { signInWithGoogle } from '../utils/googleAuth';
 
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
@@ -123,34 +122,15 @@ export default function Register() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    try {
-      const googleUser = await signInWithGoogle();
-      const response = await loginWithGoogle(googleUser.email, googleUser.name, googleUser.avatar);
-      setLoading(false);
+    const response = await loginWithGoogle();
+    setLoading(false);
 
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Account linked and logged in successfully via Google!'
-        });
-        navigate('/');
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Login Failed',
-          text: response.message
-        });
-      }
-    } catch (error) {
-      setLoading(false);
-      if (!error.message?.includes('dismissed')) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Auth Error',
-          text: error.message
-        });
-      }
+    if (!response.success) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Google Login Failed',
+        text: response.message
+      });
     }
   };
 

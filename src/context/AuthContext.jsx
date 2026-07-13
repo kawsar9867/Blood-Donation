@@ -1,148 +1,106 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { authClient } from '../lib/auth-client';
 
 const AuthContext = createContext();
 
-const API_URL = import.meta.env.VITE_API_URL;
+// Configure axios to always send credentials/cookies
+axios.defaults.withCredentials = true;
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const session = authClient.useSession();
+  const loading = session.isPending;
 
-  // Synchronous initialization on startup
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+  // Map Better Auth user to match existing application schema
+  const user = session.data?.user ? {
+    id: session.data.user.id,
+    _id: session.data.user.id, // compatibility with mongo references
+    name: session.data.user.name,
+    email: session.data.user.email,
+    avatar: session.data.user.avatar || session.data.user.image || 'https://i.ibb.co/Mgs9DkB/default-avatar.png',
+    bloodGroup: session.data.user.bloodGroup,
+    district: session.data.user.district,
+    upazila: session.data.user.upazila,
+    role: session.data.user.role || 'donor',
+    status: session.data.user.status || 'active'
+  } : null;
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
-  }, []);
-
-  // Sync token validation / profile check in background
-  useEffect(() => {
-    const validateToken = async () => {
-      const savedToken = localStorage.getItem('token');
-      if (savedToken) {
-        try {
-          const res = await axios.get(`${API_URL}/users/profile`, {
-            headers: { Authorization: `Bearer ${savedToken}` }
-          });
-          setUser(res.data);
-          localStorage.setItem('user', JSON.stringify(res.data));
-        } catch (err) {
-          console.error("Token verification failed", err);
-          // Token is expired or user is blocked
-          logout();
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    };
-
-    if (token) {
-      validateToken();
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+  const token = session.data?.session?.token || null;
 
   const login = async (email, password) => {
-    setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-      const { token: receivedToken, user: receivedUser } = res.data;
-      
-      setToken(receivedToken);
-      setUser(receivedUser);
-      localStorage.setItem('token', receivedToken);
-      localStorage.setItem('user', JSON.stringify(receivedUser));
-      setLoading(false);
-      
+      const res = await authClient.signIn.email({ email, password });
+      if (res.error) {
+        return { success: false, message: res.error.message || 'Login failed' };
+      }
       return { success: true };
     } catch (err) {
-      setLoading(false);
-      return {
-        success: false,
-        message: err.response?.data?.message || 'Login failed. Please check your credentials.'
-      };
-    }
-  };
-
-  const loginWithGoogle = async (email, name, avatar) => {
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_URL}/auth/google-login`, { email, name, avatar });
-      const { token: receivedToken, user: receivedUser } = res.data;
-
-      setToken(receivedToken);
-      setUser(receivedUser);
-      localStorage.setItem('token', receivedToken);
-      localStorage.setItem('user', JSON.stringify(receivedUser));
-      setLoading(false);
-
-      return { success: true };
-    } catch (err) {
-      setLoading(false);
-      return {
-        success: false,
-        message: err.response?.data?.message || 'Google Login failed.'
-      };
+      return { success: false, message: err.message || 'Login failed' };
     }
   };
 
   const register = async (userData) => {
-    setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/auth/register`, userData);
-      const { token: receivedToken, user: receivedUser } = res.data;
-
-      setToken(receivedToken);
-      setUser(receivedUser);
-      localStorage.setItem('token', receivedToken);
-      localStorage.setItem('user', JSON.stringify(receivedUser));
-      setLoading(false);
-
+      const res = await authClient.signUp.email({
+        email: userData.email,
+        password: userData.password,
+        name: userData.name,
+        image: userData.avatar,
+        avatar: userData.avatar,
+        bloodGroup: userData.bloodGroup,
+        district: userData.district,
+        upazila: userData.upazila
+      });
+      if (res.error) {
+        return { success: false, message: res.error.message || 'Registration failed' };
+      }
       return { success: true };
     } catch (err) {
-      setLoading(false);
-      return {
-        success: false,
-        message: err.response?.data?.message || 'Registration failed.'
-      };
+      return { success: false, message: err.message || 'Registration failed' };
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const loginWithGoogle = async () => {
+    try {
+      const res = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: window.location.origin
+      });
+      if (res.error) {
+        return { success: false, message: res.error.message || 'Google Login failed' };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message || 'Google Login failed' };
+    }
+  };
+
+  const logout = async () => {
+    await authClient.signOut();
   };
 
   const updateProfile = async (profileData) => {
     try {
-      const res = await axios.put(`${API_URL}/users/profile`, profileData, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await authClient.updateUser({
+        name: profileData.name,
+        image: profileData.avatar,
+        avatar: profileData.avatar,
+        bloodGroup: profileData.bloodGroup,
+        district: profileData.district,
+        upazila: profileData.upazila
       });
-      setUser(res.data);
-      localStorage.setItem('user', JSON.stringify(res.data));
+      if (res.error) {
+        return { success: false, message: res.error.message || 'Failed to update profile.' };
+      }
       return { success: true };
     } catch (err) {
-      return {
-        success: false,
-        message: err.response?.data?.message || 'Failed to update profile.'
-      };
+      return { success: false, message: err.message || 'Failed to update profile.' };
     }
   };
 
-  // Helper to attach authorization header
   const getAuthHeaders = () => {
+    // Cookies are automatically sent because of axios.defaults.withCredentials = true.
+    // Setting Bearer token authorization header as fallback.
     return { headers: { Authorization: `Bearer ${token}` } };
   };
 
