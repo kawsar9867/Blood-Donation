@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { Loader } from 'lucide-react';
+import GoogleLoginModal from '../components/GoogleLoginModal';
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth();
@@ -11,6 +12,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,44 +39,28 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSelect = async (selectedEmail, name, avatar) => {
+    setShowGoogleModal(false);
     setLoading(true);
-    try {
-      const { signInWithPopup } = await import('firebase/auth');
-      const { auth, googleProvider } = await import('../firebase/firebase.config');
-      
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      const response = await loginWithGoogle(user.email, user.displayName, user.photoURL);
-      setLoading(false);
-      
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Logged In',
-          text: 'Welcome back with Google!',
-          timer: 1500,
-          showConfirmButton: false
-        });
-        navigate('/');
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Login Failed',
-          text: response.message
-        });
-      }
-    } catch (error) {
-      setLoading(false);
-      console.error(error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Auth Error',
-          text: error.message || 'Something went wrong during Google Login.'
-        });
-      }
+
+    const response = await loginWithGoogle(selectedEmail, name, avatar);
+    setLoading(false);
+
+    if (response.success) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Logged In',
+        text: 'Welcome back with Google!',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      navigate('/');
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: 'Login Failed',
+        text: response.message
+      });
     }
   };
 
@@ -134,7 +120,7 @@ export default function Login() {
           type="button"
           className="btn btn-outline"
           style={{ width: '100%', display: 'flex', gap: '0.75rem', justifyContent: 'center', borderColor: '#e2e8f0', color: 'var(--text-primary)' }}
-          onClick={handleGoogleLogin}
+          onClick={() => setShowGoogleModal(true)}
           disabled={loading}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -150,6 +136,12 @@ export default function Login() {
           Don't have an account yet? <Link to="/register" style={{ color: 'var(--primary)', fontWeight: '600' }}>Register Here</Link>
         </p>
       </div>
+
+      <GoogleLoginModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelect={handleGoogleSelect}
+      />
 
       <style>{`
         @keyframes spin {

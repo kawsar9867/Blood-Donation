@@ -5,6 +5,7 @@ import { districts, upazilas } from '../utils/geo';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import { Loader } from 'lucide-react';
+import GoogleLoginModal from '../components/GoogleLoginModal';
 
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
@@ -25,6 +26,7 @@ export default function Register() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   // Filter upazilas based on chosen district
   const selectedDistrictObj = districts.find(d => d.name === formData.district);
@@ -120,42 +122,26 @@ export default function Register() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSelect = async (selectedEmail, name, avatar) => {
+    setShowGoogleModal(false);
     setLoading(true);
-    try {
-      const { signInWithPopup } = await import('firebase/auth');
-      const { auth, googleProvider } = await import('../firebase/firebase.config');
-      
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      const response = await loginWithGoogle(user.email, user.displayName, user.photoURL);
-      setLoading(false);
-      
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Account linked and logged in successfully via Google!'
-        });
-        navigate('/');
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Login Failed',
-          text: response.message
-        });
-      }
-    } catch (error) {
-      setLoading(false);
-      console.error(error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Auth Error',
-          text: error.message || 'Something went wrong during Google Auth.'
-        });
-      }
+
+    const response = await loginWithGoogle(selectedEmail, name, avatar);
+    setLoading(false);
+
+    if (response.success) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Account linked and logged in successfully via Google!'
+      });
+      navigate('/');
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: 'Google Login Failed',
+        text: response.message
+      });
     }
   };
 
@@ -317,7 +303,7 @@ export default function Register() {
           type="button"
           className="btn btn-outline"
           style={{ width: '100%', display: 'flex', gap: '0.75rem', justifyContent: 'center', borderColor: '#e2e8f0', color: 'var(--text-primary)' }}
-          onClick={handleGoogleLogin}
+          onClick={() => setShowGoogleModal(true)}
           disabled={loading || avatarUploading}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -333,6 +319,12 @@ export default function Register() {
           Already have an account? <Link to="/login" style={{ color: 'var(--primary)', fontWeight: '600' }}>Login Here</Link>
         </p>
       </div>
+
+      <GoogleLoginModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelect={handleGoogleSelect}
+      />
 
       <style>{`
         @keyframes spin {
