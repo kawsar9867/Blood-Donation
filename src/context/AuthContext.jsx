@@ -105,10 +105,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, register, logout, updateProfile, getAuthHeaders }}>
+    <AuthContext.Provider value={{ user, session, token, loading, login, loginWithGoogle, register, logout, updateProfile, getAuthHeaders }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => useContext(AuthContext);
+export const useSession = () => authClient.useSession();
