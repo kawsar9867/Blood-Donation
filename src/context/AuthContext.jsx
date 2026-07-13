@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
     status: session.data.user.status || 'active'
   } : null;
 
-  const token = session.data?.session?.token || null;
+  const token = session.data?.session?.token || session.data?.session?.id || null;
 
   const login = async (email, password) => {
     try {
