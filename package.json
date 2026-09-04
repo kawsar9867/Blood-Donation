@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@better-auth/mongo-adapter": "^1.7.1",
     "@stripe/react-stripe-js": "^6.7.0",
     "@stripe/stripe-js": "^9.9.0",
     "axios": "^1.18.1",
     "better-auth": "^1.6.23",
     "lucide-react": "^1.24.0",
+    "mongodb": "^7.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",

@@ -151,39 +151,37 @@ export default function Register() {
         role,})
 
     try {
-      const { data, error } = await authClient.signUp.email({
+      const result = await register({
         name,
         email,
         password,
-        image: avatar,
+        avatar,
         bloodGroup,
         district,
         upazila,
         role,
       });
 
-      if (error) {
-        console.error("Registration error:", error);
+      if (!result.success) {
+        console.error("Registration error:", result.message);
         Swal.fire({
           icon: "error",
           title: "Registration Failed",
-          text: error.message || "Registration failed. Please try again.",
+          text: result.message || "Registration failed. Please try again.",
         });
         setLoading(false);
         return;
       }
 
-      if (data) {
-        Swal.fire({
-          icon: "success",
-          title: "Account Created!",
-          text: "Your account has been created successfully.",
-          timer: 2000,
-          showConfirmButton: false,
-        }).then(() => {
-          navigate("/login");
-        });
-      }
+      Swal.fire({
+        icon: "success",
+        title: "Account Created!",
+        text: "Your account has been created successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      }).then(() => {
+        navigate("/login");
+      });
     } catch (err) {
       console.error("Unexpected error:", err);
       Swal.fire({
