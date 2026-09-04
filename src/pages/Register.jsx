@@ -1,64 +1,106 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import Swal from 'sweetalert2';
-import { Loader, User, Stethoscope, ShieldCheck } from 'lucide-react';
-import { districts, upazilas } from '../utils/geo';
-import axios from 'axios';
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import Swal from "sweetalert2";
+import { Loader, User, Stethoscope, ShieldCheck } from "lucide-react";
+import { districts, upazilas } from "../utils/geo";
+import axios from "axios";
+import { authClient } from "../lib/auth-client";
 
 export default function Register() {
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [avatar, setAvatar] = useState('https://i.ibb.co/Mgs9DkB/default-avatar.png');
-  const [bloodGroup, setBloodGroup] = useState('A+');
-  const [district, setDistrict] = useState('');
-  const [upazila, setUpazila] = useState('');
-  const [role, setRole] = useState('donor'); // 'donor' (Client), 'volunteer' (Doctor), 'admin'
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [avatar, setAvatar] = useState(
+    "https://i.ibb.co/Mgs9DkB/default-avatar.png",
+  );
+  const [bloodGroup, setBloodGroup] = useState("A+");
+  const [district, setDistrict] = useState("");
+  const [upazila, setUpazila] = useState("");
+  const [role, setRole] = useState("donor"); // 'donor' (Client), 'volunteer' (Doctor), 'admin'
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const selectedDistrictObj = districts.find(d => d.name === district);
-  const filteredUpazilas = selectedDistrictObj
-    ? upazilas.filter(u => u.district_id === selectedDistrictObj.id)
+  const selectedDistrictObj = districts.find((d) => d.name === district);
+  const filteredUpazilas =
+    selectedDistrictObj ?
+      upazilas.filter((u) => u.district_id === selectedDistrictObj.id)
     : [];
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid File",
+        text: "Please upload an image file. Using default avatar for now.",
+      });
+      return;
+    }
+
     setUploading(true);
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append("image", file);
 
     try {
       const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_IMGBB_API_KEY') {
-        throw new Error('ImageBB API Key is not configured in your frontend .env file.');
+      if (!apiKey || apiKey === "YOUR_IMGBB_API_KEY") {
+        console.warn("ImageBB API key not configured, using default avatar.");
+        Swal.fire({
+          icon: "info",
+          title: "Image Upload Skipped",
+          text: "ImageBB API key is not configured. Default avatar will be used.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        setAvatar("https://i.ibb.co/Mgs9DkB/default-avatar.png");
+        return;
       }
-      const response = await axios.post(`https://api.imgbb.com/1/upload?key=${apiKey}`, formData);
-      if (response.data && response.data.data && response.data.data.url) {
+
+      const response = await axios.post(
+        `https://api.imgbb.com/1/upload?key=${apiKey}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          withCredentials: false,
+          timeout: 15000,
+        },
+      );
+
+      if (
+        response.data &&
+        response.data.success &&
+        response.data.data &&
+        response.data.data.url
+      ) {
         setAvatar(response.data.data.url);
         Swal.fire({
-          icon: 'success',
-          title: 'Uploaded!',
-          text: 'Avatar image uploaded successfully to ImageBB.',
+          icon: "success",
+          title: "Uploaded!",
+          text: "Avatar image uploaded successfully.",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
       } else {
-        throw new Error('Image upload failed');
+        throw new Error(response.data?.error?.message || "Image upload failed");
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Upload error, falling back to default avatar:", err);
+      setAvatar("https://i.ibb.co/Mgs9DkB/default-avatar.png");
       Swal.fire({
-        icon: 'error',
-        title: 'Upload Failed',
-        text: err.message || 'Failed to upload image to ImageBB.'
+        icon: "info",
+        title: "Upload Network Error",
+        text: "Could not upload image to external server. Default avatar set.",
+        timer: 2000,
+        showConfirmButton: false,
       });
     } finally {
       setUploading(false);
@@ -68,133 +110,154 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // পাসওয়ার্ড ম্যাচিং চেক
+    // Password matching check
     if (password !== confirmPassword) {
-      return Swal.fire({
-        icon: 'error',
-        title: 'Validation Error',
-        text: 'Passwords do not match!'
+      Swal.fire({
+        icon: "error",
+        title: "Password Mismatch",
+        text: "Passwords don't match. Please try again.",
       });
+      return;
     }
 
-    // পাসওয়ার্ড লেংথ চেক (ঐচ্ছিক কিন্তু স্ট্যান্ডার্ড প্র্যাকটিস)
+    // Password length check
     if (password.length < 6) {
-      return Swal.fire({
-        icon: 'error',
-        title: 'Validation Error',
-        text: 'Password must be at least 6 characters long.'
+      Swal.fire({
+        icon: "error",
+        title: "Password Too Short",
+        text: "Password must be at least 6 characters long.",
       });
+      return;
     }
 
     if (!district || !upazila) {
-      return Swal.fire({
-        icon: 'error',
-        title: 'Validation Error',
-        text: 'Please select your District and Upazila!'
+      Swal.fire({
+        icon: "error",
+        title: "Location Required",
+        text: "Please select your district and upazila.",
       });
+      return;
     }
 
     setLoading(true);
 
-    try {
-      const result = await register({
-        name,
+    console.log({name,
         email,
         password,
-        avatar,
+         avatar,
         bloodGroup,
         district,
         upazila,
-        role
+        role,})
+
+    try {
+      const { data, error } = await authClient.signUp.email({
+        name,
+        email,
+        password,
+        image: avatar,
+        bloodGroup,
+        district,
+        upazila,
+        role,
       });
 
-      if (result.success) {
+      if (error) {
+        console.error("Registration error:", error);
         Swal.fire({
-          icon: 'success',
-          title: 'Registration Successful',
-          text: `Welcome! Account created as ${role === 'donor' ? 'Client (Donor)' : role === 'volunteer' ? 'Doctor (Volunteer)' : 'Admin'}.`,
-          timer: 1500,
-          showConfirmButton: false
+          icon: "error",
+          title: "Registration Failed",
+          text: error.message || "Registration failed. Please try again.",
         });
         setLoading(false);
-        navigate('/');
-      } else {
-        setLoading(false);
+        return;
+      }
+
+      if (data) {
         Swal.fire({
-          icon: 'error',
-          title: 'Registration Failed',
-          text: result.message || 'Something went wrong.'
+          icon: "success",
+          title: "Account Created!",
+          text: "Your account has been created successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        }).then(() => {
+          navigate("/login");
         });
       }
-    } catch (error) {
-      setLoading(false);
+    } catch (err) {
+      console.error("Unexpected error:", err);
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'An unexpected error occurred. Please try again.'
+        icon: "error",
+        title: "Registration Failed",
+        text: err.message || "An unexpected error occurred. Please try again.",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      const response = await loginWithGoogle();
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Logged In',
-          text: 'Welcome back!',
-          timer: 1500,
-          showConfirmButton: false
-        });
-        setLoading(false);
-        navigate('/');
-      } else {
-        setLoading(false);
-        Swal.fire({
-          icon: 'error',
-          title: 'Google Login Failed',
-          text: response.message || 'Google authentication failed.'
-        });
-      }
-    } catch (error) {
-      setLoading(false);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Could not connect to Google services.'
-      });
-    }
+    await authClient.signIn.social({
+      provider: "google",
+    });
   };
 
   return (
-    <div style={{ maxWidth: '480px', margin: '3rem auto', padding: '0 1rem' }}>
+    <div style={{ maxWidth: "480px", margin: "3rem auto", padding: "0 1rem" }}>
       <div className="card">
-        <h2 style={{ textAlign: 'center', marginBottom: '0.25rem', color: 'var(--primary)' }}>Create Account</h2>
-        <p style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+        <h2
+          style={{
+            textAlign: "center",
+            marginBottom: "0.25rem",
+            color: "var(--primary)",
+          }}
+        >
+          Create Account
+        </h2>
+        <p
+          style={{
+            textAlign: "center",
+            marginBottom: "1.5rem",
+            fontSize: "0.9rem",
+            color: "var(--text-secondary)",
+          }}
+        >
           Join us to start managing your donations.
         </p>
 
         {/* Account Role / Section Selector */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label className="form-label" style={{ fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label
+            className="form-label"
+            style={{
+              fontSize: "0.85rem",
+              marginBottom: "0.5rem",
+              display: "block",
+            }}
+          >
             Select Account Section / Role:
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "0.5rem",
+            }}
+          >
             <button
               type="button"
-              className={`btn ${role === 'donor' ? 'btn-primary' : 'btn-outline'}`}
+              className={`btn ${role === "donor" ? "btn-primary" : "btn-outline"}`}
               style={{
-                padding: '0.6rem 0.25rem',
-                fontSize: '0.8rem',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.25rem',
-                borderColor: role === 'donor' ? 'var(--primary)' : 'var(--border)'
+                padding: "0.6rem 0.25rem",
+                fontSize: "0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.25rem",
+                borderColor:
+                  role === "donor" ? "var(--primary)" : "var(--border)",
               }}
-              onClick={() => setRole('donor')}
+              onClick={() => setRole("donor")}
             >
               <User size={18} />
               <span>Client</span>
@@ -202,17 +265,18 @@ export default function Register() {
 
             <button
               type="button"
-              className={`btn ${role === 'volunteer' ? 'btn-primary' : 'btn-outline'}`}
+              className={`btn ${role === "volunteer" ? "btn-primary" : "btn-outline"}`}
               style={{
-                padding: '0.6rem 0.25rem',
-                fontSize: '0.8rem',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.25rem',
-                borderColor: role === 'volunteer' ? 'var(--primary)' : 'var(--border)'
+                padding: "0.6rem 0.25rem",
+                fontSize: "0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.25rem",
+                borderColor:
+                  role === "volunteer" ? "var(--primary)" : "var(--border)",
               }}
-              onClick={() => setRole('volunteer')}
+              onClick={() => setRole("volunteer")}
             >
               <Stethoscope size={18} />
               <span>Doctor</span>
@@ -220,17 +284,18 @@ export default function Register() {
 
             <button
               type="button"
-              className={`btn ${role === 'admin' ? 'btn-primary' : 'btn-outline'}`}
+              className={`btn ${role === "admin" ? "btn-primary" : "btn-outline"}`}
               style={{
-                padding: '0.6rem 0.25rem',
-                fontSize: '0.8rem',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.25rem',
-                borderColor: role === 'admin' ? 'var(--primary)' : 'var(--border)'
+                padding: "0.6rem 0.25rem",
+                fontSize: "0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.25rem",
+                borderColor:
+                  role === "admin" ? "var(--primary)" : "var(--border)",
               }}
-              onClick={() => setRole('admin')}
+              onClick={() => setRole("admin")}
             >
               <ShieldCheck size={18} />
               <span>Admin</span>
@@ -266,7 +331,18 @@ export default function Register() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Avatar Image (Upload to ImageBB)</label>
+            <label className="form-label">
+              Profile Picture / Avatar (Optional)
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Paste image URL or upload below (optional)"
+              value={avatar}
+              onChange={(e) => setAvatar(e.target.value)}
+              disabled={loading || uploading}
+              style={{ marginBottom: "0.5rem" }}
+            />
             <input
               type="file"
               className="form-control"
@@ -274,11 +350,48 @@ export default function Register() {
               onChange={handleImageUpload}
               disabled={loading || uploading}
             />
-            {uploading && <p style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '0.25rem' }}>Uploading image...</p>}
+            {uploading && (
+              <p
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--primary)",
+                  marginTop: "0.25rem",
+                }}
+              >
+                Uploading image...
+              </p>
+            )}
             {!uploading && avatar && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <img src={avatar} alt="Preview" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{avatar}</span>
+              <div
+                style={{
+                  marginTop: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <img
+                  src={avatar}
+                  alt="Preview"
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    e.target.src = "https://i.ibb.co/Mgs9DkB/default-avatar.png";
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "var(--text-secondary)",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {avatar}
+                </span>
               </div>
             )}
           </div>
@@ -312,13 +425,15 @@ export default function Register() {
                 value={district}
                 onChange={(e) => {
                   setDistrict(e.target.value);
-                  setUpazila('');
+                  setUpazila("");
                 }}
                 disabled={loading}
               >
                 <option value="">Select District</option>
-                {districts.map(d => (
-                  <option key={d.id} value={d.name}>{d.name}</option>
+                {districts.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -333,8 +448,10 @@ export default function Register() {
                 disabled={loading || !district}
               >
                 <option value="">Select Upazila</option>
-                {filteredUpazilas.map(u => (
-                  <option key={u.id} value={u.name}>{u.name}</option>
+                {filteredUpazilas.map((u) => (
+                  <option key={u.id} value={u.name}>
+                    {u.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -370,48 +487,105 @@ export default function Register() {
             type="submit"
             className="btn btn-primary"
             style={{
-              width: '100%',
-              marginTop: '1.5rem',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '0.5rem'
+              width: "100%",
+              marginTop: "1.5rem",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.5rem",
             }}
             disabled={loading}
           >
-            {loading ? (
+            {loading ?
               <>
                 <Loader className="animate-spin" size={18} />
                 <span>Creating Account...</span>
               </>
-            ) : 'Sign Up'}
+            : "Sign Up"}
           </button>
         </form>
 
-        <div style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0', color: 'var(--text-muted)' }}>
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border)' }} />
-          <span style={{ padding: '0 10px', fontSize: '0.85rem' }}>OR</span>
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border)' }} />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            margin: "1.5rem 0",
+            color: "var(--text-muted)",
+          }}
+        >
+          <hr
+            style={{
+              flex: 1,
+              border: "none",
+              borderTop: "1px solid var(--border)",
+            }}
+          />
+          <span style={{ padding: "0 10px", fontSize: "0.85rem" }}>OR</span>
+          <hr
+            style={{
+              flex: 1,
+              border: "none",
+              borderTop: "1px solid var(--border)",
+            }}
+          />
         </div>
 
         <button
           type="button"
           className="btn btn-outline"
-          style={{ width: '100%', display: 'flex', gap: '0.75rem', justifyContent: 'center', alignItems: 'center', borderColor: '#e2e8f0', color: 'var(--text-primary)' }}
+          style={{
+            width: "100%",
+            display: "flex",
+            gap: "0.75rem",
+            justifyContent: "center",
+            alignItems: "center",
+            borderColor: "#e2e8f0",
+            color: "var(--text-primary)",
+          }}
           onClick={handleGoogleLogin}
           disabled={loading}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              fill="#4285F4"
+            />
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              fill="#34A853"
+            />
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              fill="#EA4335"
+            />
           </svg>
           Sign up with Google
         </button>
 
-        <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem' }}>
-          Already have an account? <Link to="/login" style={{ color: 'var(--primary)', fontWeight: '600' }}>Login Here</Link>
+        <p
+          style={{
+            marginTop: "1.5rem",
+            textAlign: "center",
+            fontSize: "0.9rem",
+          }}
+        >
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            style={{ color: "var(--primary)", fontWeight: "600" }}
+          >
+            Login Here
+          </Link>
         </p>
       </div>
 
