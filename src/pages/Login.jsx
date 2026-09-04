@@ -41,7 +41,7 @@ export default function Login() {
           showConfirmButton: false
         });
         setLoading(false);
-        navigate('/');
+        navigate('/dashboard');
       } else {
         setLoading(false);
         Swal.fire({

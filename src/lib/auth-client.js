@@ -7,6 +7,9 @@ const SERVER_URL = API_URL.endsWith("/api")
 
 export const authClient = createAuthClient({
   baseURL: SERVER_URL,
+  fetchOptions: {
+    credentials: "include",
+  },
 });
 
 export const { signIn, signUp, useSession, signOut } = authClient;

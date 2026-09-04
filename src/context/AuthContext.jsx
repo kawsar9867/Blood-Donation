@@ -34,13 +34,25 @@ export const AuthProvider = ({ children }) => {
     : null;
 
   const token =
-    session.data?.session?.token || session.data?.session?.id || null;
+    session.data?.session?.token || session.data?.session?.id || localStorage.getItem("better_auth_token") || null;
+
+  useEffect(() => {
+    const currentToken = session.data?.session?.token || session.data?.session?.id;
+    if (currentToken) {
+      localStorage.setItem("better_auth_token", currentToken);
+    } else if (!session.isPending && !session.data) {
+      localStorage.removeItem("better_auth_token");
+    }
+  }, [session.data, session.isPending]);
 
   const login = async (email, password) => {
     try {
       const res = await authClient.signIn.email({ email, password });
       if (res.error) {
         return { success: false, message: res.error.message || "Login failed" };
+      }
+      if (res.data?.session?.token) {
+        localStorage.setItem("better_auth_token", res.data.session.token);
       }
       return { success: true };
     } catch (err) {
@@ -74,6 +86,10 @@ export const AuthProvider = ({ children }) => {
           success: false,
           message: error.message || "Registration failed",
         };
+      }
+
+      if (result?.session?.token) {
+        localStorage.setItem("better_auth_token", result.session.token);
       }
 
       return {
@@ -113,6 +129,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      localStorage.removeItem("better_auth_token");
       await authClient.signOut();
     } catch (err) {
       console.error("Logout error:", err);
@@ -146,7 +163,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getAuthHeaders = () => {
-    return { headers: { Authorization: `Bearer ${token}` } };
+    const activeToken = token || localStorage.getItem("better_auth_token");
+    return { headers: { Authorization: `Bearer ${activeToken}` } };
   };
 
   return (
